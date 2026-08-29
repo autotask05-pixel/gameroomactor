@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloudflare Actors Game Client (http://localhost:8787)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --panel-bg: #161e2e;
+            --panel-border: #2d3748;
+            --accent-color: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.25);
+            --success-color: #22c55e;
+            --warning-color: #eab308;
+            --danger-color: #ef4444;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            margin: 0 0 6px 0;
+            font-size: 26px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .layout {
+            display: flex;
+            gap: 24px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .sidebar {
+            width: 340px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 12px;
+            padding: 18px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+            width: 100%;
+        }
+
+        .controls-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 12px;
+            width: 100%;
+        }
+
+        input, select {
+            padding: 9px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--panel-border);
+            background: #0f172a;
+            color: var(--text-main);
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--accent-color);
+        }
+
+        button {
+            padding: 9px 14px;
+            border-radius: 6px;
+            border: none;
+            background: var(--accent-color);
+            color: #0b0f19;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        button:hover { opacity: 0.9; }
+
+        button.btn-success { background: var(--success-color); color: #0b0f19; }
+        button.btn-danger { background: var(--danger-color); color: #ffffff; }
+        button.btn-bot { background: #818cf8; color: #0b0f19; }
+
+        .preset-rooms {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+
+        .preset-rooms button {
+            flex: 1;
+            padding: 6px 8px;
+            font-size: 12px;
+            background: #1e293b;
+            color: var(--text-muted);
+            border: 1px solid var(--panel-border);
+        }
+
+        .preset-rooms button.active {
+            background: var(--accent-color);
+            color: #0b0f19;
+            font-weight: 700;
+        }
+
+        .canvas-container {
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid var(--panel-border);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+        }
+
+        canvas {
+            display: block;
+            background: #030712;
+        }
+
+        .status-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 12px;
+            padding: 10px 16px;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .phase-LOBBY { background: #3b82f6; color: #ffffff; }
+        .phase-COUNTDOWN { background: #eab308; color: #000000; }
+        .phase-PLAYING { background: #22c55e; color: #000000; }
+        .phase-GAME_OVER { background: #ef4444; color: #ffffff; }
+
+        .leaderboard-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-radius: 6px;
+            background: #0f172a;
+            border: 1px solid #1e293b;
+            font-size: 13px;
+        }
+
+        .leaderboard-item.self {
+            border-color: var(--accent-color);
+            background: rgba(56, 189, 248, 0.1);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .metric-card {
+            background: #0f172a;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #1e293b;
+        }
+
+        .metric-title {
+            color: var(--text-muted);
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+
+        .metric-val {
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-top: 2px;
+        }
+
+        .winner-modal {
+            display: none;
+            padding: 14px;
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: #052e16;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 16px;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Cloudflare Actors Real-Time Game Server</h1>
+        <p class="subtitle">Connecting to Wrangler Dev Server at <strong>ws://localhost:8787/ws</strong></p>
+    </header>
+
+    <div class="layout">
+        <div class="main-content">
+            <!-- Room & Server Controls -->
+            <div class="panel" style="margin-bottom: 14px;">
+                <div class="preset-rooms">
+                    <button class="active" onclick="selectPresetRoom('room1')">Room 1</button>
+                    <button onclick="selectPresetRoom('room2')">Room 2</button>
+                    <button onclick="selectPresetRoom('pvp-arena')">PvP Arena</button>
+                </div>
+
+                <div class="controls-grid">
+                    <input type="text" id="serverInput" placeholder="Server WS URL" value="ws://localhost:8787/ws" style="flex: 2; min-width: 180px;">
+                    <input type="text" id="roomInput" placeholder="Room ID" value="room1" style="flex: 1; min-width: 90px;">
+                    <input type="text" id="nameInput" placeholder="Player Name" value="Player" style="flex: 1; min-width: 90px;">
+                    <button onclick="connect()">Connect / Switch</button>
+                    <button class="btn-success" onclick="triggerStartGame()">Start Game</button>
+                    <button class="btn-bot" onclick="spawnTestBots()">Spawn 2 Bots</button>
+                    <button class="btn-danger" onclick="disconnect()">Disconnect</button>
+                </div>
+            </div>
+
+            <!-- Status HUD -->
+            <div class="status-header">
+                <div>
+                    <span style="color: var(--text-muted);">Room:</span>
+                    <strong id="currentRoomDisplay" style="color: var(--accent-color); margin-right: 12px;">room1</strong>
+                    <span style="color: var(--text-muted);">Status:</span>
+                    <span id="connectionStatus" style="font-weight: bold; color: var(--danger-color);">Disconnected</span>
+                </div>
+                <div>
+                    <span id="phaseBadge" class="status-badge phase-LOBBY">LOBBY</span>
+                    <span id="timerDisplay" style="font-weight: 700; margin-left: 10px; font-size: 14px;">Waiting for players...</span>
+                </div>
+            </div>
+
+            <!-- Canvas Arena -->
+            <div class="canvas-container">
+                <canvas id="gameCanvas" width="800" height="600"></canvas>
+            </div>
+        </div>
+
+        <!-- Sidebar: Leaderboard & Telemetry -->
+        <div class="sidebar">
+            <div id="winnerBanner" class="winner-modal">
+                🏆 Winner: <span id="winnerName">-</span>
+            </div>
+
+            <div class="panel">
+                <h3 style="margin: 0 0 8px 0; font-size: 15px; color: var(--accent-color);">Live Leaderboard</h3>
+                <div class="leaderboard-list" id="leaderboardList">
+                    <div class="leaderboard-item"><em>No active players</em></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3 style="margin: 0 0 6px 0; font-size: 15px; color: var(--accent-color);">Server Telemetry</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-title">Server Tick</div>
+                        <div class="metric-val" id="metricTick">0</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Tick Exec (P95)</div>
+                        <div class="metric-val" id="metricExec">0.0 ms</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Tick Drift</div>
+                        <div class="metric-val" id="metricDrift">0.0 ms</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-title">Players / Coins</div>
+                        <div class="metric-val" id="metricCounts">0 / 0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3 style="margin: 0 0 6px 0; font-size: 15px; color: var(--text-main);">Controls</h3>
+                <p style="color: var(--text-muted); font-size: 13px; margin: 0; line-height: 1.5;">
+                    - Move with <strong>WASD</strong> or <strong>Arrow Keys</strong>.<br>
+                    - Collect gold coins (+1 pt each).<br>
+                    - First to <strong>15 pts</strong> or top score after <strong>60s</strong> wins!<br>
+                    - Click <strong>Spawn 2 Bots</strong> to simulate 2+ player matches instantly.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let localPlayerId = null;
+        let seq = 1;
+        let currentRoom = 'room1';
+        let botSockets = [];
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const serverInput = document.getElementById('serverInput');
+        const roomInput = document.getElementById('roomInput');
+        const nameInput = document.getElementById('nameInput');
+        const currentRoomDisplay = document.getElementById('currentRoomDisplay');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const phaseBadge = document.getElementById('phaseBadge');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const leaderboardList = document.getElementById('leaderboardList');
+        const winnerBanner = document.getElementById('winnerBanner');
+        const winnerName = document.getElementById('winnerName');
+
+        const metricTick = document.getElementById('metricTick');
+        const metricExec = document.getElementById('metricExec');
+        const metricDrift = document.getElementById('metricDrift');
+        const metricCounts = document.getElementById('metricCounts');
+
+        function selectPresetRoom(roomName) {
+            roomInput.value = roomName;
+            document.querySelectorAll('.preset-rooms button').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase().includes(roomName.toLowerCase()) || (btn.textContent === 'Room 1' && roomName === 'room1') || (btn.textContent === 'Room 2' && roomName === 'room2'));
+            });
+            connect();
+        }
+
+        function connect() {
+            clearBots();
+            if (ws) ws.close();
+
+            const baseUrl = serverInput.value.trim() || 'ws://localhost:8787/ws';
+            const roomName = roomInput.value.trim() || 'room1';
+            const playerName = nameInput.value.trim() || 'Player';
+            currentRoom = roomName;
+            currentRoomDisplay.textContent = roomName;
+
+            const wsUrl = `${baseUrl}?room=${encodeURIComponent(roomName)}&name=${encodeURIComponent(playerName)}`;
+
+            ws = new WebSocket(wsUrl);
+            ws.binaryType = 'arraybuffer';
+
+            ws.onopen = () => {
+                connectionStatus.textContent = 'Connected';
+                connectionStatus.style.color = '#22c55e';
+            };
+
+            ws.onmessage = (event) => {
+                if (typeof event.data === 'string') {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === 'welcome') {
+                        localPlayerId = msg.playerId;
+                    }
+                } else if (event.data instanceof ArrayBuffer) {
+                    decodeAndRenderSnapshot(event.data);
+                }
+            };
+
+            ws.onclose = () => {
+                connectionStatus.textContent = 'Disconnected';
+                connectionStatus.style.color = '#ef4444';
+            };
+        }
+
+        function triggerStartGame() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'start' }));
+            }
+        }
+
+        function disconnect() {
+            clearBots();
+            if (ws) ws.close();
+        }
+
+        function clearBots() {
+            botSockets.forEach(bot => {
+                try { bot.ws.close(); } catch(_) {}
+                if (bot.timer) clearInterval(bot.timer);
+            });
+            botSockets = [];
+        }
+
+        function spawnTestBots() {
+            const baseUrl = serverInput.value.trim() || 'ws://localhost:8787/ws';
+            const roomName = roomInput.value.trim() || 'room1';
+            const dirs = ['U', 'D', 'L', 'R'];
+
+            for (let i = 1; i <= 2; i++) {
+                const botName = `Bot_${Math.floor(Math.random() * 900 + 100)}`;
+                const botUrl = `${baseUrl}?room=${encodeURIComponent(roomName)}&name=${encodeURIComponent(botName)}`;
+                const botWs = new WebSocket(botUrl);
+                let botSeq = 1;
+
+                botWs.onopen = () => {
+                    const timer = setInterval(() => {
+                        if (botWs.readyState === WebSocket.OPEN) {
+                            const randomDir = dirs[Math.floor(Math.random() * dirs.length)];
+                            botWs.send(JSON.stringify({
+                                type: 'input',
+                                seq: botSeq++,
+                                input: randomDir,
+                                clientTimestamp: Date.now()
+                            }));
+                        }
+                    }, 100);
+                    botSockets.push({ ws: botWs, timer });
+                };
+            }
+        }
+
+        // Input Keyboard Handling
+        const activeKeys = {};
+        window.addEventListener('keydown', (e) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+                e.preventDefault();
+            }
+            activeKeys[e.key] = true;
+            sendInput();
+        });
+
+        window.addEventListener('keyup', (e) => {
+            activeKeys[e.key] = false;
+        });
+
+        function sendInput() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+            let dir = null;
+            if (activeKeys['ArrowUp'] || activeKeys['w'] || activeKeys['W']) dir = 'U';
+            else if (activeKeys['ArrowDown'] || activeKeys['s'] || activeKeys['S']) dir = 'D';
+            else if (activeKeys['ArrowLeft'] || activeKeys['a'] || activeKeys['A']) dir = 'L';
+            else if (activeKeys['ArrowRight'] || activeKeys['d'] || activeKeys['D']) dir = 'R';
+
+            if (dir) {
+                ws.send(JSON.stringify({
+                    type: 'input',
+                    seq: seq++,
+                    input: dir,
+                    clientTimestamp: Date.now()
+                }));
+            }
+        }
+
+        // Binary Snapshot Decoding
+        function decodeAndRenderSnapshot(buffer) {
+            const view = new DataView(buffer);
+            let offset = 0;
+
+            const magic = view.getUint16(offset, true); offset += 2;
+            if (magic !== 0x4753) return;
+
+            const version = view.getUint8(offset); offset += 1;
+            const phaseCode = view.getUint8(offset); offset += 1;
+            const serverTick = view.getUint32(offset, true); offset += 4;
+            const timestamp = view.getFloat64(offset, true); offset += 8;
+            const execMs = view.getUint32(offset, true); offset += 4;
+            const driftMs = view.getUint32(offset, true); offset += 4;
+            const playerCount = view.getUint16(offset, true); offset += 2;
+            const collectibleCount = view.getUint16(offset, true); offset += 2;
+            const countdownSec = view.getUint16(offset, true); offset += 2;
+            const remainingMatchSec = view.getUint16(offset, true); offset += 2;
+            const winnerId = view.getUint32(offset, true); offset += 4;
+            const totalInputsRecv = view.getUint32(offset, true); offset += 4;
+            const totalInputsProc = view.getUint32(offset, true); offset += 4;
+            const totalTicks = view.getUint32(offset, true); offset += 4;
+
+            const phases = ['LOBBY', 'COUNTDOWN', 'PLAYING', 'GAME_OVER'];
+            const phase = phases[phaseCode] || 'LOBBY';
+
+            phaseBadge.textContent = phase;
+            phaseBadge.className = `status-badge phase-${phase}`;
+
+            if (phase === 'COUNTDOWN') {
+                timerDisplay.textContent = `Starting in: ${countdownSec}s`;
+                timerDisplay.style.color = 'var(--warning-color)';
+            } else if (phase === 'PLAYING') {
+                timerDisplay.textContent = `Match Timer: ${remainingMatchSec}s`;
+                timerDisplay.style.color = 'var(--success-color)';
+            } else if (phase === 'GAME_OVER') {
+                timerDisplay.textContent = `Restarting in 5s...`;
+                timerDisplay.style.color = 'var(--danger-color)';
+            } else {
+                timerDisplay.textContent = `Waiting for min 2 players...`;
+                timerDisplay.style.color = 'var(--text-muted)';
+            }
+
+            metricTick.textContent = serverTick;
+            metricExec.textContent = `${(execMs / 1000).toFixed(2)} ms`;
+            metricDrift.textContent = `${(driftMs / 1000).toFixed(2)} ms`;
+            metricCounts.textContent = `${playerCount} / ${collectibleCount}`;
+
+            const players = [];
+            for (let i = 0; i < playerCount; i++) {
+                const id = view.getUint32(offset, true); offset += 4;
+                const x = view.getFloat32(offset, true); offset += 4;
+                const y = view.getFloat32(offset, true); offset += 4;
+                const score = view.getUint32(offset, true); offset += 4;
+                const lastSeq = view.getUint32(offset, true); offset += 4;
+                const qLen = view.getUint16(offset, true); offset += 2;
+                offset += 2;
+                const qDelay = view.getFloat32(offset, true); offset += 4;
+
+                players.push({ id, x, y, score });
+            }
+
+            const collectibles = [];
+            for (let i = 0; i < collectibleCount; i++) {
+                const id = view.getUint32(offset, true); offset += 4;
+                const x = view.getFloat32(offset, true); offset += 4;
+                const y = view.getFloat32(offset, true); offset += 4;
+                collectibles.push({ id, x, y });
+            }
+
+            if (phase === 'GAME_OVER' && winnerId > 0) {
+                winnerBanner.style.display = 'block';
+                const winner = players.find(p => p.id === winnerId);
+                winnerName.textContent = winner ? `Player ${winner.id} (${winner.score} pts)` : `Player ${winnerId}`;
+            } else {
+                winnerBanner.style.display = 'none';
+            }
+
+            renderGame(players, collectibles);
+            renderLeaderboard(players);
+        }
+
+        function renderGame(players, collectibles) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 40) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 40) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+
+            for (const item of collectibles) {
+                ctx.fillStyle = '#eab308';
+                ctx.beginPath();
+                ctx.arc(item.x, item.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#fef08a';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            for (const p of players) {
+                const isSelf = p.id === localPlayerId;
+                const color = isSelf ? '#38bdf8' : '#f43f5e';
+
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+                ctx.fill();
+
+                if (isSelf) {
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 14, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = '600 12px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`P${p.id} (${p.score}pts)`, p.x, p.y - 18);
+            }
+        }
+
+        function renderLeaderboard(players) {
+            if (players.length === 0) {
+                leaderboardList.innerHTML = '<div class="leaderboard-item"><em>No active players</em></div>';
+                return;
+            }
+
+            const sorted = [...players].sort((a, b) => b.score - a.score);
+            leaderboardList.innerHTML = sorted.map((p, idx) => `
+                <div class="leaderboard-item ${p.id === localPlayerId ? 'self' : ''}">
+                    <span>#${idx + 1} Player ${p.id} ${p.id === localPlayerId ? '(You)' : ''}</span>
+                    <strong style="color: var(--accent-color);">${p.score} pts</strong>
+                </div>
+            `).join('');
+        }
+
+        connect();
+    </script>
+</body>
+</html>
