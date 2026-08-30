@@ -9,7 +9,6 @@ import {
 // ============================================================
 
 export interface Env {
-    
     MY_SOCKETS_ACTOR: DurableObjectNamespace;
 }
 
@@ -286,7 +285,6 @@ export class MySocketsActor extends Actor<Env> {
 
         this.players.delete(ws);
 
-
         void player;
     }
 
@@ -313,14 +311,14 @@ export class MySocketsActor extends Actor<Env> {
         }
 
         if (typeof message === 'string') {
-
+            // ==========================================
+            // FALLBACK: Existing JSON Logic
+            // ==========================================
             try {
                 const input = JSON.parse(message);
 
                 if (input.type === 'input') {
-
                     const seq = Number(input.seq);
-
                     let dir: Direction | null = null;
 
                     if (
@@ -332,48 +330,81 @@ export class MySocketsActor extends Actor<Env> {
                         dir = input.input;
                     }
 
-                    if (
-                        seq > player.latestReceivedSequence &&
-                        seq <=
-                            player.latestReceivedSequence +
-                            MAX_SEQUENCE_JUMP &&
-                        dir
-                    ) {
+                    this.processPlayerInput(player, seq, input.clientTimestamp || 0, dir);
+                }
+            } catch (_) {
+                player.invalidInputs++;
+            }
+        } else if (message instanceof ArrayBuffer) {
+            // ==========================================
+            // NEW: Ultra-Fast Binary Logic
+            // ==========================================
+            try {
+                // Expected Packet Length: 14 bytes
+                // [0]    Uint8:   Message Type (1 = Input)
+                // [1-4]  Uint32:  Sequence Number (Little Endian)
+                // [5-12] Float64: Client Timestamp (Little Endian)
+                // [13]   Uint8:   Direction (1=U, 2=D, 3=L, 4=R)
+                
+                if (message.byteLength >= 14) {
+                    const view = new DataView(message);
+                    const msgType = view.getUint8(0);
+                    
+                    if (msgType === 1) { // 1 = Input message
+                        const seq = view.getUint32(1, true);
+                        const clientTimestamp = view.getFloat64(5, true);
+                        const dirCode = view.getUint8(13);
+                        
+                        let dir: Direction | null = null;
+                        if (dirCode === 1) dir = 'U';
+                        else if (dirCode === 2) dir = 'D';
+                        else if (dirCode === 3) dir = 'L';
+                        else if (dirCode === 4) dir = 'R';
 
-                        player.inputQueue.push({
-                            seq,
-                            clientTimestamp:
-                                input.clientTimestamp || 0,
-                            receivedAt:
-                                performance.now(),
-                            direction: dir,
-                        });
-
-                        if (
-                            player.inputQueue.length >
-                            MAX_INPUT_QUEUE
-                        ) {
-                            player.inputQueue.shift();
-                        }
-
-                        player.latestReceivedSequence =
-                            seq;
-
-                        player.totalInputsReceived++;
-
-                        this.totalInputsReceived++;
+                        this.processPlayerInput(player, seq, clientTimestamp, dir);
                     }
                 }
-
             } catch (_) {
                 player.invalidInputs++;
             }
         }
 
         this.savePlayer(ws, player);
-
         this.pumpTicks();
     }
+
+    /**
+     * Helper method to deduplicate the queue insertion logic 
+     * shared by both JSON and Binary handlers.
+     */
+    private processPlayerInput(
+        player: Player, 
+        seq: number, 
+        clientTimestamp: number, 
+        dir: Direction | null
+    ): void {
+        if (
+            seq > player.latestReceivedSequence &&
+            seq <= player.latestReceivedSequence + MAX_SEQUENCE_JUMP &&
+            dir
+        ) {
+            player.inputQueue.push({
+                seq,
+                clientTimestamp,
+                receivedAt: performance.now(),
+                direction: dir,
+            });
+
+            if (player.inputQueue.length > MAX_INPUT_QUEUE) {
+                player.inputQueue.shift();
+            }
+
+            player.latestReceivedSequence = seq;
+            player.totalInputsReceived++;
+            this.totalInputsReceived++;
+        }
+    }
+
 
     // ========================================================
     // EVENT-DRIVEN LOOP
