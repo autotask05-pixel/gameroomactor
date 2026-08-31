@@ -16,7 +16,7 @@ export const options = {
             startVUs: 0,
             stages: [
                 { duration: '15s', target: 50 },  // Ramp up to 50 concurrent players
-                { duration: '30s', target: 50 },  // Sustain 50 players (intense game)
+                { duration: '30s', target: 50 },  // Sustain 50 players 
                 { duration: '10s', target: 0 },   // Graceful scale down
             ],
             gracefulRampDown: '10s',
