@@ -9,61 +9,84 @@ pricing :0.1 gbs / min (6players 20 hz)+6*60*20.(7200)360 req
 
 
 
-# Cloudflare Actor: Real-Time Multiplayer Game Server
 
-This repository contains a highly scalable, real-time multiplayer game server backend built using **Cloudflare Actors**. It handles WebSocket connections, authoritative game logic, and state broadcasting using an optimized binary protocol. 
+***
 
-## 🚀 Key Features
+# 🌐 Edge-Native Multiplayer Game Server
 
-*   **Multi-Instance Scaling:** Instantly spin up isolated game rooms without pre-allocating resources using a `roomId` query parameter.
-*   **Authoritative Game Loop:** Event-driven server ticks process inputs, movement, and collision detection to prevent client-side cheating.
-*   **Dynamic Tick Rate:** The first player joining a room dictates the server speed (up to 64Hz; defaults to 20Hz).
-*   **Optimized Binary Protocol:** Broadcasts game state to all connected clients via highly compressed `ArrayBuffer` packets to save bandwidth and reduce latency.
-*   **Ephemeral In-Memory State:** Player states are held securely in memory for maximum performance (state is intentionally discarded on Actor hibernation/eviction).
-*   **Lag Compensation & Catch-up:** Dynamic constraint system handles input queues and fast-forwards tick processing seamlessly.
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Actors-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)
+![WebSockets](https://img.shields.io/badge/WebSockets-010101?style=for-the-badge&logo=socketdotio&logoColor=white)
 
-## ⚙️ Game Constants & Rules
+An authoritative, highly scalable real-time multiplayer game server engineered on top of **Cloudflare Actors (Durable Objects)**. 
 
-*   **Max Players per Room:** 500
-*   **Arena Size:** 800 x 600
-*   **Player Radius:** 10 (with basic circle-based collision detection)
-*   **Speed:** 5 units per tick
-*   **Max Input Queue:** 30 moves
+This project demonstrates how to build low-latency, infinitely scalable game rooms at the network edge, utilizing custom binary protocols and strictly in-memory state management for zero-latency overhead.
 
-## 🌐 Connection & Routing
+## 🎯 Project Overview & The Challenge
 
-### **Connecting to a Room**
-Connect via WebSocket to the `/ws` endpoint.
-*   **URL Format:** `wss://<your-worker-domain>/ws?roomId=<ROOM_NAME>&serverHz=<TICK_RATE>`
-*   **`roomId`:** String to isolate instances. Defaults to `global-lobby` if omitted.
-*   **`serverHz`:** (Optional) Sets the room's tick rate if you are the first player (1-64).
+Traditional multiplayer game servers rely on centralized infrastructure, which can introduce latency and require complex scaling orchestration (e.g., Kubernetes + Agones). 
 
-### **HTTP Health Check**
-Sending a standard GET request to the Actor URL returns a JSON payload containing room status, player count, tick rate, and server uptime.
+**The Solution:** I designed this serverless architecture using Cloudflare Actors. Each game room is an isolated V8 isolate running at the edge. Millions of game rooms can be instantiated on-demand via a simple URL parameter without any pre-allocation of server resources.
 
-## 📡 Messaging Protocol
+## 🚀 Technical Highlights & Achievements
 
-### **1. Client to Server (JSON)**
-Clients send their movement inputs in JSON format:
-```json
-{
-  "type": "input",
-  "seq": 123,
-  "clientTimestamp": 1693151234567,
-  "input": "U" // Accepts 'U' (Up), 'D' (Down), 'L' (Left), 'R' (Right)
-}
+*   **Infinite Edge Scalability:** Engineered dynamic multi-instance routing. The system reads the `?roomId=` parameter and seamlessly spawns or routes to an isolated Actor instance.
+*   **Custom Binary Protocol:** To minimize bandwidth and maximize parsing speed, I implemented a strict 14-byte binary input protocol and a tightly packed snapshot broadcast using `ArrayBuffer` and `DataView`. *(Includes a JSON fallback for legacy clients).*
+*   **Authoritative Game Loop:** Implemented a custom event-driven game loop (`pumpTicks`) that handles fast-forwarding, time drift, and dynamic tick rates (up to 64Hz) dictated by the first connected client.
+*   **Spatial Math & Collision:** Built a 2D circular collision detection system using squared-distance calculations (`dx*dx + dy*dy`) to optimize CPU cycles on the server.
+*   **Zero-Storage Memory Management:** State is explicitly kept out of persistent storage to ensure maximum WebSocket broadcast performance. Implemented active dead-socket purging and client catch-up logic.
+
+---
+
+## 🧠 Architecture & Flow
+
+1.  **Connection:** A client connects via WebSocket (`/ws?roomId=X`).
+2.  **Instantiation:** Cloudflare spawns a single Actor for `roomId=X` in a data center close to the players.
+3.  **Input Queueing:** Player inputs (Direction, Sequence, Timestamp) are received via binary frames and queued in memory.
+4.  **Tick Execution:** The server processes inputs, calculates physics/collisions, and updates authoritative positions.
+5.  **Broadcast:** The server packs the global state into a single ArrayBuffer and broadcasts it to all connected sockets in one optimized call.
+
+---
+
+## 🔬 Deep Dive: Protocol Optimization
+
+To demonstrate low-level memory manipulation, here is how the custom binary protocol is structured to avoid the overhead of JSON serialization during the hot path:
+
+**Client Input (14 Bytes):**
+```text
+[0]    Uint8:   Message Type (1 = Input)
+[1-4]  Uint32:  Sequence Number (Little Endian)
+[5-12] Float64: Client Timestamp (Little Endian)
+[13]   Uint8:   Direction Code (1=U, 2=D, 3=L, 4=R)
 ```
 
-### **2. Server to Client (JSON & Binary)**
-*   **Welcome Packet (JSON):** Upon connection, the server sends a welcome message containing the assigned `playerId` and the room's `tickRate`.
-*   **Game State Snapshots (Binary):** During every tick cycle, the server broadcasts an authoritative state snapshot in a strict byte format (Header + Player Array) using a `DataView` buffer.
+**Server Snapshot (Broadcasted every tick):**
+*   **Header (40 Bytes):** Magic Number validation, Server Tick, Tick Execution Time, Drift, and Player Count.
+*   **Entity Data (24 Bytes/Player):** Player ID, X/Y Coordinates, Last Processed Sequence (for client-side prediction/reconciliation), and Queue metrics.
 
-## 🛠️ Deployment Configuration
+---
 
-To deploy this Actor, ensure your `wrangler.toml` is configured with the correct Durable Object bindings:
+## 🛠️ Skills Demonstrated
 
-```toml
-[[durable_objects.bindings]]
-name = "MY_SOCKETS_ACTOR"
-class_name = "MySocketsActor"
-```
+*   **Languages:** TypeScript, Node.js API concepts.
+*   **Architecture:** Serverless / Edge Computing, Distributed Systems, Actor Model.
+*   **Game Development:** Authoritative Servers, Client-Side Prediction concepts, Tick Rates, Collision Detection.
+*   **Low-Level Networking:** WebSockets, Binary Data Serialization (`ArrayBuffer`, `DataView`, Endianness), Bandwidth Optimization.
+
+---
+
+## 💻 Code Structure
+
+*   `MySocketsActor`: The core class handling the WebSocket lifecycle and game state.
+*   `processPlayerInput()`: Deduplicates and validates queue insertions.
+*   `pumpTicks()`: The heart of the server, managing time drift and executing steps.
+*   `simulateStep()`: Resolves movement and physics calculations.
+*   `broadcastSnapshot()`: Encodes the state into binary and ships it to clients.
+
+> *Feel free to explore the source code to see the implementation of the binary DataViews and the physics loop!*
+>  Deployment
+Make sure you have Wrangler installed.
+> npm create cloudflare@latest gameroom-app -- --template autotask05-pixel/gameroomactor
+> cd gameroom-app
+> wrangler dev
+
