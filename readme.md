@@ -1,4 +1,4 @@
-Here is a clear, concise, and effective `README.md` for your Cloudflare Actors game server code.
+
 
 ***
 
