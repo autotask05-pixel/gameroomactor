@@ -9,7 +9,7 @@ A scalable, authoritative real-time game server built using [Cloudflare Actors](
 ## 🚀 Key Features
 
 *   **Multi-Room Architecture:** Infinitely scalable instances routed dynamically via the `?roomId=` query parameter. No pre-allocation required.
-*   **Dynamic Tick Rate:** The first player in a room dictates the server's update rate (default 20Hz, up to 64Hz).
+*   **Dynamic Tick Rate:** The first player in a room dictates the server's update rate (default 20Hz, up to 512Hz).
 *   **Ultra-Fast Binary Protocol:** Uses `ArrayBuffer` and `DataView` for high-performance, low-bandwidth communication, with a JSON fallback.
 *   **Authoritative State:** Server processes inputs, handles 2D circular collision detection, and broadcasts the absolute truth to clients.
 *   **In-Memory Performance:** State is strictly in-memory to ensure zero latency overhead from storage operations.
@@ -23,7 +23,7 @@ Connect to the server via WebSocket. You can spawn or join isolated game rooms b
 **Endpoint:** `ws://<YOUR_WORKER_URL>/ws?roomId=my-room-123&serverHz=30`
 
 *   `roomId`: (Optional) The unique identifier for the game instance. Defaults to `global-lobby`.
-*   `serverHz`: (Optional) The requested tick rate for the room (1-64). Only applied if you are the first player to join the room.
+*   `serverHz`: (Optional) The requested tick rate for the room (1-512). Only applied if you are the first player to join the room.
 
 ---
 
