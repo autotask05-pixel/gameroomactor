@@ -215,7 +215,7 @@ export class MySocketsActor extends Actor<Env> {
 
             if (
                 requestedHz > 0 &&
-                requestedHz <= 64
+                requestedHz <= 512
             ) {
                 this.tickRate = requestedHz;
                 this.tickPeriodMs =
