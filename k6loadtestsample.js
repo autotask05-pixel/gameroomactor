@@ -34,7 +34,7 @@ export default function () {
     const roomId = getRandomRoom();
     
     // Connect to the specific Worker URL from the HTML configuration
-    const url = `wss://s5.n8271435.workers.dev/ws?roomId=${roomId}&serverHz=60`;
+    const url = `wss://"yourgameactorurl"/ws?roomId=${roomId}&serverHz=20`;//replace with your actor url
 
     const res = ws.connect(url, null, function (socket) {
         let seq = 0;
